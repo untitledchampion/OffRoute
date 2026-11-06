@@ -1,0 +1,11 @@
+build/
+dist/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+icon/out/
+icon/AppIcon.iconset/
+state.json
+status.json
+*.log

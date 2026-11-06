@@ -1,0 +1,13 @@
+#!/bin/bash
+# Stop what an earlier version runs (service, menu icon, window) before the new app is copied.
+# The service takes its pf rule away on SIGTERM; flush the anchor anyway in case an old version could not.
+USER_NAME=$(stat -f%Su /dev/console)
+USER_ID=$(id -u "$USER_NAME" 2>/dev/null || echo "")
+launchctl bootout system/local.vpn-autoroute 2>/dev/null
+sleep 1
+pfctl -a com.apple/250.vpn-autoroute -F all 2>/dev/null
+[ -n "$USER_ID" ] && launchctl bootout "gui/$USER_ID/local.vpn-autoroute.menu" 2>/dev/null
+pkill -f "/Applications/OffRoute.app/Contents/MacOS/OffRoute" 2>/dev/null
+pkill -f "/Applications/vpn-autoroute.app/Contents/MacOS/vpn-autoroute" 2>/dev/null
+pkill -f "autoroute[.]py run" 2>/dev/null
+exit 0

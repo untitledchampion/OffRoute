@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<style>
+:root{--bg:#0b0d0c;--card:#141716;--card2:#1a1e1c;--line:#262b29;--text:#f2f4f3;--muted:#8b9490;--faint:#5c6561;--green:#2fe36b;--green-dim:#1f8f47;--red:#ff5d50;--amber:#f2b33d}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font:14px -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;background:var(--bg);color:var(--text);-webkit-user-select:none;user-select:none;display:flex;flex-direction:column;overflow:hidden}
+.hero{position:relative;text-align:center;padding:26px 16px 18px;overflow:hidden;flex:none}
+#power{position:relative;width:150px;height:150px;border-radius:50%;border:3px solid #3a403d;background:radial-gradient(circle at 50% 45%,#1b201d 0%,#0b0d0c 70%);cursor:pointer;padding:0;display:inline-flex;align-items:center;justify-content:center;transition:border-color .2s,box-shadow .2s}
+#power img{width:112px;height:112px;object-fit:contain;filter:grayscale(1) brightness(.75);transition:filter .2s}
+#power.on{border-color:var(--green);box-shadow:0 0 22px rgba(47,227,107,.55),inset 0 0 18px rgba(47,227,107,.25)}
+#power.on img{filter:drop-shadow(0 0 6px rgba(47,227,107,.6))}
+#power.err{border-color:var(--red);box-shadow:0 0 16px rgba(255,93,80,.4)}
+#state{position:relative;font-size:22px;font-weight:700;margin:14px 0 2px}
+#sub{position:relative;color:var(--muted);font-size:12px;max-width:290px;margin:0 auto;line-height:1.4}
+#hint{position:relative;color:var(--faint);font-size:11px;margin-top:6px}
+.body{flex:1;display:flex;flex-direction:column;min-height:0;padding:0 14px 10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;flex:none}
+.row{display:flex;align-items:center;gap:12px;padding:12px 14px}
+.row+.row{border-top:1px solid var(--line)}
+.row .ic{width:20px;height:20px;color:var(--muted);flex:none}
+.row span{flex:1}
+.sw{position:relative;width:44px;height:26px;flex:none}
+.sw input{opacity:0;width:0;height:0}
+.sw b{position:absolute;inset:0;background:#3a403d;border-radius:13px;cursor:pointer;transition:.15s}
+.sw b:before{content:"";position:absolute;width:22px;height:22px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.15s}
+.sw input:checked+b{background:var(--green)}
+.sw input:checked+b:before{transform:translateX(18px)}
+.warn{margin-top:10px;background:#2a2110;border:1px solid #4a3a16;color:var(--amber);border-radius:14px;padding:10px 14px;font-size:12px;display:none;align-items:center;gap:10px}
+.warn.show{display:flex}
+.warn span{flex:1}
+.btn{border:1px solid var(--line);background:var(--card2);color:var(--text);border-radius:10px;padding:6px 10px;font:inherit;font-size:12px;cursor:pointer}
+.head{display:flex;align-items:baseline;justify-content:space-between;margin:16px 2px 8px;flex:none}
+.head b{font-size:15px}
+#list{flex:1;min-height:60px;overflow-y:auto;background:var(--card);border:1px solid var(--line);border-radius:14px}
+.site{display:flex;align-items:center;gap:8px;padding:9px 14px}
+.site+.site{border-top:1px solid var(--line)}
+.site .n{flex:1;min-width:0}
+.site .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.site .meta{font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ib{border:none;background:none;color:var(--muted);cursor:pointer;padding:4px 6px;border-radius:8px;font:inherit;font-size:12px}
+.ib:hover{background:var(--card2);color:var(--text)}
+.empty{color:var(--faint);text-align:center;padding:22px 10px;font-size:13px}
+.foot{display:flex;justify-content:flex-start;padding:10px 4px 0;flex:none}
+.foot .ib{display:inline-flex;align-items:center;gap:6px;color:var(--faint)}
+</style>
+</head>
+<body>
+<div class="hero">
+  <button id="power" title="Включить или выключить"><img src="icon/helmet.png" alt=""></button>
+  <div id="state">…</div>
+  <div id="sub"></div>
+  <div id="hint"></div>
+</div>
+<div class="body">
+  <div class="card">
+    <div class="row">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>
+      <span>Автозагрузка</span>
+      <label class="sw"><input type="checkbox" id="auto"><b></b></label>
+    </div>
+  </div>
+  <div class="warn" id="warn"><span id="warntext"></span><button class="btn" id="fixam">Настроить</button></div>
+  <div class="head"><b id="count">Через VPN</b></div>
+  <div id="list"></div>
+  <div class="foot"><button class="ib" id="uninst">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+    Удалить службу</button></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+let S=null;
+function api(){return window.pywebview&&window.pywebview.api}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function render(){
+  if(!S)return;
+  const on=S.enabled, alive=S.alive, ok=S.installed&&alive;
+  $("power").classList.toggle("on",on&&ok&&!!S.tunnel);
+  $("power").classList.toggle("err",!ok);
+  $("state").textContent=!S.installed?"Не установлено":!alive?"Служба не работает":(on?"Включено":"Выключено");
+  $("sub").textContent=!S.installed?"установите OffRoute из OffRoute.pkg":!alive?"перезагрузите Mac или переустановите OffRoute":!S.tunnel?"подключите AmneziaVPN — OffRoute работает вместе с ней":(on?"OffRoute сам находит заблокированные сайты и пускает их через AmneziaVPN, остальное, в том числе российские сайты, — без VPN":"весь трафик идёт через AmneziaVPN, как обычно — российские сайты могут не открываться");
+  $("hint").textContent=ok?(on?"нажмите на шлем, чтобы выключить":"нажмите на шлем, чтобы включить"):"";
+  $("auto").checked=S.autostart;
+  const bad=S.checks.filter(c=>!c.ok);
+  $("warn").classList.toggle("show",bad.length>0);
+  $("warntext").textContent=bad.length?"AmneziaVPN: "+bad.map(c=>c.text.toLowerCase()).join(", "):"";
+  $("count").textContent=`Через VPN · ${S.sites.length}`;
+  const shown=S.sites.slice(0,500);
+  $("list").innerHTML=shown.length?shown.map(s=>{
+    const nm=s.name.startsWith("?")?s.name.slice(1):s.name;
+    const n=s.ips.length, m10=n%10, m100=n%100;
+    const word=(m10===1&&m100!==11)?"адрес":(m10>=2&&m10<=4&&(m100<12||m100>14))?"адреса":"адресов";
+    const app=(s.app||"").replace(/^Google Chrome.*/,"Chrome").replace(/ Helper.*$/,"").replace(/ H$/,"");
+    const meta=[n>1?`${n} ${word}`:s.ips[0],app].filter(Boolean).join(" · ");
+    return `<div class="site"><div class="n"><div class="nm">${esc(nm)}</div><div class="meta" title="${esc(s.ips.join(", "))}">${esc(meta)}</div></div><button class="ib" data-op="remove" data-s="${esc(s.name)}" title="Убрать из VPN">убрать</button></div>`;
+  }).join(""):`<div class="empty">Пока пусто — заблокированные сайты появятся здесь сами</div>`;
+}
+let pend={};  // switches the user just flipped: show the new value until the service confirms it (max 10 s)
+function applyPending(){const now=Date.now();
+  if(pend.enabled&&now<pend.enabled.until){if(S.enabled===pend.enabled.v)delete pend.enabled;else S.enabled=pend.enabled.v}else delete pend.enabled;
+}
+async function refresh(){if(!api())return;try{S=await api().state();applyPending();render()}catch(e){}}
+let asked=false;
+async function askAmnezia(force){
+  if(!S||!S.amnezia_bad||(asked&&!force))return;
+  asked=true;
+  if(S.amnezia_consent===false&&!force)return;
+  const yes=confirm("Чтобы OffRoute работал, в AmneziaVPN нужно выключить Kill Switch и включить раздельное туннелирование «только адреса из списка». OffRoute сам поменяет это и перезапустит Амнезию — VPN отключится на несколько секунд. Сделать?");
+  await api().set_amnezia_consent(yes);
+}
+$("power").onclick=async()=>{if(!S||!S.alive)return;const v=!S.enabled;if(v)await askAmnezia(true);pend.enabled={v,until:Date.now()+10000};S.enabled=v;render();await api().send(v?"enable":"disable","")};
+$("auto").onchange=async e=>{await api().set_autostart(e.target.checked)};
+$("fixam").onclick=()=>askAmnezia(true);
+$("uninst").onclick=async()=>{if(confirm("Удалить службу OffRoute? Сайты перестанут автоматически идти через VPN. Потом приложение можно выбросить в корзину."))await api().uninstall()};
+$("list").onclick=async e=>{const b=e.target.closest("button[data-op]");if(!b)return;b.disabled=true;await api().send(b.dataset.op,b.dataset.s);setTimeout(refresh,1200)};
+window.addEventListener("pywebviewready",async()=>{await refresh();if(S&&S.amnezia_consent!==false&&S.amnezia_consent!==true)askAmnezia(false);setInterval(refresh,2000)});
+</script>
+</body>
+</html>

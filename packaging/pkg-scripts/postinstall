@@ -1,0 +1,69 @@
+#!/bin/bash
+# Runs as root after /Applications/OffRoute.app is in place: installs the service and the menu icon and opens the
+# window for the logged-in user. Plists are written with plistlib (paths are escaped properly), the service's
+# memory and logs live in root-owned folders.
+APP="/Applications/OffRoute.app"
+EXE="$APP/Contents/MacOS/OffRoute"
+PY="$APP/Contents/Resources/python/bin/python3"
+USER_NAME=$(stat -f%Su /dev/console)
+if [ -z "$USER_NAME" ] || [ "$USER_NAME" = "root" ] || [ "$USER_NAME" = "loginwindow" ]; then
+  echo "OffRoute: no user logged in at the console; the service will be set up at the next start of the app"
+  exit 0
+fi
+USER_ID=$(id -u "$USER_NAME")
+USER_HOME=$(dscl . -read "/Users/$USER_NAME" NFSHomeDirectory | awk '{print $2}')
+
+# leftovers of earlier versions
+rm -rf /Applications/vpn-autoroute.app /usr/local/libexec/vpn-autoroute
+
+mkdir -p "/Library/Application Support/OffRoute" /Library/Logs/OffRoute
+chown root:wheel "/Library/Application Support/OffRoute" /Library/Logs/OffRoute
+chmod 755 "/Library/Application Support/OffRoute" /Library/Logs/OffRoute
+
+"$PY" -I -s - "$EXE" "$USER_HOME" <<'PYEOF'
+import plistlib, sys, os
+exe, home = sys.argv[1], sys.argv[2]
+daemon = {
+    "Label": "local.vpn-autoroute",
+    "ProgramArguments": [exe, "--service"],
+    # read once to take over the memory of version 0.2 (validated, never followed through a link)
+    "EnvironmentVariables": {"VPN_AUTOROUTE_DATA": os.path.join(home, "Library/Application Support/vpn-autoroute")},
+    "RunAtLoad": True,
+    "KeepAlive": True,
+    "StandardOutPath": "/dev/null",
+    "StandardErrorPath": "/Library/Logs/OffRoute/service-errors.log",
+}
+path = "/Library/LaunchDaemons/local.vpn-autoroute.plist"
+with open(path, "wb") as f:
+    plistlib.dump(daemon, f)
+os.chown(path, 0, 0)
+os.chmod(path, 0o644)
+PYEOF
+launchctl bootstrap system /Library/LaunchDaemons/local.vpn-autoroute.plist
+
+sudo -u "$USER_NAME" mkdir -p "$USER_HOME/Library/LaunchAgents"
+sudo -u "$USER_NAME" "$PY" -I -s - "$EXE" "$APP" "$USER_HOME" <<'PYEOF'
+import plistlib, sys, os
+exe, app, home = sys.argv[1:4]
+agent = {
+    "Label": "local.vpn-autoroute.menu",
+    "ProgramArguments": [exe, "--menu"],
+    "EnvironmentVariables": {"VPN_AUTOROUTE_APP": app},
+    "RunAtLoad": True,
+    "KeepAlive": {"SuccessfulExit": False},
+    "StandardErrorPath": "/dev/null",
+}
+with open(os.path.join(home, "Library/LaunchAgents/local.vpn-autoroute.menu.plist"), "wb") as f:
+    plistlib.dump(agent, f)
+PYEOF
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  launchctl bootstrap "gui/$USER_ID" "$USER_HOME/Library/LaunchAgents/local.vpn-autoroute.menu.plist" 2>/dev/null && break
+  sleep 0.5
+done
+
+# no Dock icon (the app lives in the menu bar): remove a tile left by earlier versions
+"$PY" -I -s "$APP/Contents/Resources/app/dock_clean.py" "$USER_NAME" 2>/dev/null
+
+# open the window; it asks once whether to set AmneziaVPN up
+launchctl asuser "$USER_ID" sudo -u "$USER_NAME" open "$APP"
+exit 0

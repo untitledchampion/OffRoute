@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>OffRoute</title>
+    <welcome file="welcome.html" mime-type="text/html"/>
+    <!-- Apple Silicon only: the embedded Python and the launcher are arm64 -->
+    <options customize="never" require-scripts="true" hostArchitectures="arm64"/>
+    <volume-check>
+        <allowed-os-versions><os-version min="12.0"/></allowed-os-versions>
+    </volume-check>
+    <choices-outline><line choice="default"><line choice="local.vpn-autoroute.pkg"/></line></choices-outline>
+    <choice id="default"/>
+    <choice id="local.vpn-autoroute.pkg" visible="false"><pkg-ref id="local.vpn-autoroute.pkg"/></choice>
+    <pkg-ref id="local.vpn-autoroute.pkg" version="VERSION" onConclusion="none">OffRoute-component.pkg</pkg-ref>
+</installer-gui-script>
